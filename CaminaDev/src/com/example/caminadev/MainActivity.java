@@ -1,10 +1,12 @@
 package com.example.caminadev;
 
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 
 import android.app.Activity;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.text.format.DateFormat;
 import android.view.View;
@@ -12,29 +14,43 @@ import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.EditText;
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements SensorEventListener{
 
+	/* Sensor Variables*/
+	SensorManager sensorManager;
+	Sensor sensorAccelerometer;
+	Sensor sensorOrientation;
+	
+	/* Buttons */
 	Button start_button;
 	Button sync_button;
 	Button readings_button;
 	
+	/* EditText's */
 	EditText subject_editText;
 	EditText device_editText;
 	EditText description_editText;
 	EditText date_editText;
 
+	/* Database handlers */
 	Path_h_dataSource dataSource_h;
 	Path_d_dataSource dataSource_d;
-	static List<Path_h> paths_h;
-	static List<Path_d> paths_d;
+	static Path_h path_h;
+	static Path_d path_d;
 	static long lPath_h;
 	static String currentFileName="current_file";
+
+	/* Arrays to collect sensor data */
+	float[] acceleration;
+	float[] direction;
+	float[] gyro;
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 		
+		/* Find id */
 		subject_editText     = (EditText)findViewById(R.id.subject);
 		device_editText      = (EditText)findViewById(R.id.device);
 		description_editText = (EditText)findViewById(R.id.description);
@@ -44,41 +60,109 @@ public class MainActivity extends Activity {
 		sync_button      = (Button)findViewById(R.id.sync_button);
 		readings_button  = (Button)findViewById(R.id.readings_button);
 		
+		/* Get system date */
 		Date dCurrentTime = new Date();
 		CharSequence sCurrentTime = DateFormat.format("yyyy-MM-dd hh:mm:ss", dCurrentTime.getTime());
 		date_editText.setText(sCurrentTime);
 
-		/* Database objects */
-		dataSource_h=new Path_h_dataSource(this);
-		dataSource_h.open();
+		/* Initialize arrays */
+		acceleration = new float[3];
+		direction    = new float[3];
+		gyro         = new float[3];
 		
-		dataSource_d=new Path_d_dataSource(this);
-		dataSource_d.open();
-		
-		paths_d=null;
-		paths_d=new ArrayList<Path_d>();
+		/* Sensor Manager */
+		sensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
+	    sensorAccelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
+	    sensorOrientation   = sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION);
 		
 		start_button.setOnClickListener(new OnClickListener() {
 			public void onClick(View v) {
 
+				/* Execute only on "Start" */
 				if (start_button.getText().equals("Start")) {
 					start_button.setText("Stop");
 				
 					/* insert path_h to database */
-					Path_h path_h=null;
+					dataSource_h=new Path_h_dataSource(getApplicationContext());
+					dataSource_h.open();
+					path_h=null;
 					path_h=dataSource_h.createPath_h(subject_editText.getText().toString(), device_editText.getText().toString(), 
 							description_editText.getText().toString(), date_editText.getText().toString(), currentFileName);
 					dataSource_h.close();
 				}
 				else 
 					start_button.setText("Start");
-				
-				
-				
-				/* Start activity */
-				//startActivity(new Intent(getApplicationContext(), activity_main.class));
-				
 			}
 		});
+	}
+
+	@Override
+	public void onResume() {
+
+		sensorManager.registerListener(this, sensorAccelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+	    sensorManager.registerListener(this, sensorOrientation, SensorManager.SENSOR_DELAY_NORMAL);
+	    
+	    super.onResume();
+	}
+
+	@Override
+	 protected void onPause() {
+		
+		sensorManager.unregisterListener(this, sensorAccelerometer);
+	    sensorManager.unregisterListener(this, sensorOrientation);
+   
+	    super.onPause();
+	 }
+	
+	@Override
+	public void onAccuracyChanged(Sensor arg0, int arg1) {
+		// TODO Auto-generated method stub
+	}
+
+	@Override
+	public void onSensorChanged(SensorEvent event) {
+
+		/* read data only when the button start has been pressed */
+		if (start_button.getText().equals("pause")) {
+
+			switch(event.sensor.getType()){
+
+				/* Accelerometer Sensor */
+				case Sensor.TYPE_LINEAR_ACCELERATION:
+				{
+					/* Read data from sensor */
+					for(int i =0; i < 3; i++){
+						acceleration[i] = event.values[i];
+					}
+					
+					/* Database objects */
+					dataSource_d=new Path_d_dataSource(this);
+					dataSource_d.open();
+					path_d=null;
+					path_d=dataSource_d.createPath_d(path_h.getId(), 
+							direction[0], direction[1], direction[2],
+							acceleration[0], acceleration[1], acceleration[2],
+							gyro[0], gyro[1], gyro[2]);
+					dataSource_d.close();
+					
+				}
+				/* Orientation Sensor */
+				case Sensor.TYPE_ORIENTATION:
+				{	
+					/* Read data from sensor */
+					for(int i =0; i < 3; i++){
+						direction[i] = event.values[i];
+					}
+				}	
+				/* Gyro Sensor */
+				case Sensor.TYPE_GYROSCOPE:
+				{	
+					/* Read data from sensor */
+					for(int i =0; i < 3; i++){
+						gyro[i] = event.values[i];
+					}
+				}
+			}
+		}
 	}
 }
