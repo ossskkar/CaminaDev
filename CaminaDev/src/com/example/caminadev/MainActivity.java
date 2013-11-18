@@ -60,9 +60,12 @@ public class MainActivity extends Activity implements SensorEventListener{
 		sync_button      = (Button)findViewById(R.id.sync_button);
 		readings_button  = (Button)findViewById(R.id.readings_button);
 		
+		subject_editText.setText("Oscar");
+		device_editText.setText("SamsungS3Mini");
+		
 		/* Get system date */
 		Date dCurrentTime = new Date();
-		CharSequence sCurrentTime = DateFormat.format("yyyy-MM-dd hh:mm:ss", dCurrentTime.getTime());
+		CharSequence sCurrentTime = DateFormat.format("yyyy-MM-dd%20hh:mm:ss", dCurrentTime.getTime());
 		date_editText.setText(sCurrentTime);
 
 		/* Initialize arrays */
@@ -82,13 +85,30 @@ public class MainActivity extends Activity implements SensorEventListener{
 				if (start_button.getText().equals("Start")) {
 					start_button.setText("Stop");
 				
-					/* insert path_h to database */
+					/* Get system date */
+					Date dCurrentTime = new Date();
+					CharSequence sCurrentTime = DateFormat.format("yyyy-MM-dd%20hh:mm:ss", dCurrentTime.getTime());
+					date_editText.setText(sCurrentTime);
+					
+					/* Insert data to local database */
+					/*
 					dataSource_h=new Path_h_dataSource(getApplicationContext());
 					dataSource_h.open();
 					path_h=null;
 					path_h=dataSource_h.createPath_h(subject_editText.getText().toString(), device_editText.getText().toString(), 
 							description_editText.getText().toString(), date_editText.getText().toString(), currentFileName);
 					dataSource_h.close();
+					*/
+					
+					/* Send data to external server */
+					String url = "http://caminamaps.com/caminadev/insert_path_h.php?"
+							+"subject="+subject_editText.getText().toString()
+							+"&device="+device_editText.getText().toString()
+							+"&description="+description_editText.getText().toString()
+							+"&date="+date_editText.getText().toString();
+					
+					HttpConnection con = new HttpConnection(url);
+						(new Thread(con)).start();
 				}
 				else 
 					start_button.setText("Start");
@@ -123,7 +143,7 @@ public class MainActivity extends Activity implements SensorEventListener{
 	public void onSensorChanged(SensorEvent event) {
 
 		/* read data only when the button start has been pressed */
-		if (start_button.getText().equals("pause")) {
+		if (start_button.getText().equals("Stop")) {
 
 			switch(event.sensor.getType()){
 
@@ -135,15 +155,36 @@ public class MainActivity extends Activity implements SensorEventListener{
 						acceleration[i] = event.values[i];
 					}
 					
-					/* Database objects */
+					/* Insert data to local database */
+					/*
 					dataSource_d=new Path_d_dataSource(this);
 					dataSource_d.open();
 					path_d=null;
-					path_d=dataSource_d.createPath_d(path_h.getId(), 
-							direction[0], direction[1], direction[2],
-							acceleration[0], acceleration[1], acceleration[2],
-							gyro[0], gyro[1], gyro[2]);
+					path_d=dataSource_d.createPath_d(path_h.getId(), direction[0], direction[1], direction[2],
+							acceleration[0], acceleration[1], acceleration[2], gyro[0], gyro[1], gyro[2]);
 					dataSource_d.close();
+					*/
+					
+					/* Get system date */
+					Date dCurrentTime = new Date();
+					CharSequence sCurrentTime = DateFormat.format("hh:mm:ss", dCurrentTime.getTime());
+					
+					/* Send data to external server */
+					String url = "http://caminamaps.com/caminadev/insert_path_d.php?"
+							+"date="+sCurrentTime
+							+"&directionX="+direction[0]
+							+"&directionY="+direction[1]
+							+"&directionZ="+direction[2]
+							+"&accelerationX="+acceleration[0]
+							+"&accelerationY="+acceleration[1]
+							+"&accelerationZ="+acceleration[2]
+							+"&gyroX="+gyro[0]
+							+"&gyroY="+gyro[1]
+							+"&gyroZ="+gyro[2]
+							+"&steps=0";
+					
+					HttpConnection con = new HttpConnection(url);
+						(new Thread(con)).start();
 					
 				}
 				/* Orientation Sensor */
